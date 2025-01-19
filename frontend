@@ -1,0 +1,98 @@
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import './App.css';
+import { Line } from 'react-chartjs-2';
+import 'chart.js/auto';
+
+function App() {
+  const [city, setCity] = useState('Los Angeles');
+  const [aqiData, setAqiData] = useState(null);
+  const [prediction, setPrediction] = useState(null);
+  const [aqiHistory, setAqiHistory] = useState([]);
+
+  useEffect(() => {
+    fetchAqiData();
+  }, []);
+
+  const fetchAqiData = async () => {
+    try {
+      const response = await axios.get(`http://localhost:5000/api/aqi?city=${city}`);
+      setAqiData(response.data);
+      setAqiHistory(prev => [...prev.slice(-9), response.data.current.air_quality.pm2_5]);
+    } catch (error) {
+      console.error('Error fetching AQI data:', error);
+    }
+  };
+
+  const fetchAqiPrediction = async () => {
+    try {
+      const response = await axios.get(`http://localhost:5000/api/aqi/predict?city=${city}`);
+      setPrediction(response.data.predictedAQI);
+    } catch (error) {
+      console.error('Error fetching AQI prediction:', error);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-r from-blue-500 to-green-500 flex flex-col items-center justify-center p-6 text-white">
+      <h1 className="text-5xl font-extrabold mb-6 drop-shadow-lg">🌎 Elite AQI Monitoring</h1>
+      <div className="bg-white p-8 rounded-xl shadow-xl w-full max-w-md text-gray-800">
+        <input 
+          type="text" 
+          value={city} 
+          onChange={(e) => setCity(e.target.value)} 
+          placeholder="Enter city" 
+          className="w-full p-3 border border-gray-400 rounded-md mb-4 focus:outline-none focus:ring-4 focus:ring-blue-400"
+        />
+        <div className="flex space-x-4">
+          <button 
+            onClick={fetchAqiData} 
+            className="w-1/2 bg-blue-600 hover:bg-blue-800 text-white font-bold py-3 px-6 rounded-lg transition-transform transform hover:scale-105 shadow-md"
+          >
+            Get AQI
+          </button>
+          <button 
+            onClick={fetchAqiPrediction} 
+            className="w-1/2 bg-green-600 hover:bg-green-800 text-white font-bold py-3 px-6 rounded-lg transition-transform transform hover:scale-105 shadow-md"
+          >
+            Predict AQI
+          </button>
+        </div>
+      </div>
+      
+      {aqiData && (
+        <div className="mt-6 bg-white p-8 rounded-xl shadow-xl w-full max-w-md text-gray-800">
+          <h2 className="text-3xl font-bold text-gray-900">Current AQI for {city}</h2>
+          <p className="text-2xl font-semibold text-red-600">AQI: {aqiData.current.air_quality.pm2_5}</p>
+          <p className="text-lg text-gray-700">Condition: {aqiData.current.condition.text}</p>
+        </div>
+      )}
+      
+      {prediction && (
+        <div className="mt-6 bg-white p-8 rounded-xl shadow-xl w-full max-w-md text-gray-800">
+          <h2 className="text-3xl font-bold text-gray-900">Predicted AQI</h2>
+          <p className="text-2xl font-semibold text-green-600">{prediction}</p>
+        </div>
+      )}
+
+      {aqiHistory.length > 1 && (
+        <div className="mt-6 bg-white p-8 rounded-xl shadow-xl w-full max-w-md text-gray-800">
+          <h2 className="text-3xl font-bold text-gray-900">AQI Trends</h2>
+          <Line 
+            data={{
+              labels: aqiHistory.map((_, index) => `T-${aqiHistory.length - index}`),
+              datasets: [{
+                label: 'AQI Level',
+                data: aqiHistory,
+                borderColor: 'rgb(255, 99, 132)',
+                backgroundColor: 'rgba(255, 99, 132, 0.2)',
+              }],
+            }}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default App;

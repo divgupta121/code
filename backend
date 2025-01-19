@@ -1,0 +1,81 @@
+const express = require('express');
+const axios = require('axios');
+const cors = require('cors');
+const dotenv = require('dotenv');
+const { Pool } = require('pg');
+const path = require('path');
+
+dotenv.config();
+const app = express();
+const PORT = process.env.PORT || 5000;
+app.use(cors());
+app.use(express.json());
+
+// Serve Frontend
+app.use(express.static(path.join(__dirname, 'frontend')));
+
+// PostgreSQL Database Connection
+const pool = new Pool({
+  user: process.env.DB_USER,
+  host: process.env.DB_HOST,
+  database: process.env.DB_NAME,
+  password: process.env.DB_PASSWORD,
+  port: process.env.DB_PORT,
+});
+
+// Fetch Real-Time AQI Data
+app.get('/api/aqi', async (req, res) => {
+  try {
+    const { city } = req.query;
+    const response = await axios.get(`https://api.weatherapi.com/v1/current.json?key=${process.env.WEATHER_API_KEY}&q=${city}`);
+    res.json(response.data);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch AQI data' });
+  }
+});
+
+// Store User Preferences
+app.post('/api/users/preferences', async (req, res) => {
+  try {
+    const { userId, city, alertThreshold } = req.body;
+    await pool.query(
+      'INSERT INTO user_preferences (user_id, city, alert_threshold) VALUES ($1, $2, $3) ON CONFLICT (user_id) DO UPDATE SET city = $2, alert_threshold = $3',
+      [userId, city, alertThreshold]
+    );
+    res.json({ message: 'Preferences saved' });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to save preferences' });
+  }
+});
+
+// Retrieve User Preferences
+app.get('/api/users/preferences', async (req, res) => {
+  try {
+    const { userId } = req.query;
+    const result = await pool.query('SELECT * FROM user_preferences WHERE user_id = $1', [userId]);
+    res.json(result.rows[0]);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to retrieve preferences' });
+  }
+});
+
+// Machine Learning Model Endpoint for AQI Predictions
+app.get('/api/aqi/predict', async (req, res) => {
+  try {
+    const { city } = req.query;
+    // Placeholder for ML model integration
+    const predictedAQI = Math.floor(Math.random() * 200); // Simulating AI prediction
+    res.json({ city, predictedAQI });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to predict AQI' });
+  }
+});
+
+// Serve Frontend
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'frontend', 'index.html'));
+});
+
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
